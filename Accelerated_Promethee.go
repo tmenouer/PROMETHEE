@@ -1,19 +1,12 @@
 /*
  *
- * Accelerated PROMETHEE Algorithm
+ * Accelerated PROMETHEE Algorithm based on K-means
  *
+ * For the DTW distance, we use https://github.com/mjanda/go-dtw
+ * This is the only one dependency
+ *
+ * Christophe Cerin and Tarek Menouer - Oct 2018
  */
-
-/*
-For controling the font size:
-export GNUPLOT_DEFAULT_GDFONT="Aller"
-Or add the SetSvg function to go/src/github.com/Arafatk/glot/common.go
-func (plot *Plot) SetSvg() error {
-	return plot.Cmd(fmt.Sprintf("set terminal svg linewidth 1 font 'Arial,22' size 1280,960 ; set logscale x 2 ; set xtics right logscale;"))
-}
-ATTENTION : common.go from "github.com/Arafatk/glot" needs also to be
-adapted to allow svg outputs and linespoints style
-*/
 
 package main
 
@@ -29,6 +22,7 @@ import (
 	"sync"
 	"time"
 	"sort"
+	"go-dtw"
 )
 
 type info struct {
@@ -558,9 +552,6 @@ func PROMETHEE(MyTab []map[int]int, nodeCount int, nbDimension int) *list.List {
 	
 }
 
-
-
-
 func Maximization_objective(MyTab []map[int]int) []map[int]int {
 
 	if MyTab[0][1] == 1 {
@@ -965,6 +956,41 @@ func main() {
 		JaccardIndex(l_exact, l_proj, N*X, N, MinSize)
 		fmt.Println("We compute now the Jaccard Similarity Coefficients")
 		JaccardSimilarityCoeff(l_exact, l_proj, N*X, N, MinSize)
+
+		// prepare arrays
+		a := make([]float64,N*X)
+		b := make([]float64,N*X)
+		//a := []float64{1, 1, 1, 2, 2, 2, 3, 3, 3, 2, 2, 4, 4, 4, 4}
+		//b := []float64{1, 1, 2, 2, 3, 3, 2, 4, 4, 4}
+		l_index2 := list.New()
+		for index := 0; index < N*X; index++ {
+		    l_index2 = l_exact[index]
+		    e2 := l_index2.Front()
+		    d2 := distance(e2.Value.(map[int]int)[0], e2.Value.(map[int]int)[2])
+		    a[index] = d2
+		    e2 = e2.Next()
+	        }
+
+		l_index1 := list.New()
+		for index := 0; index < N*X; index++ {
+		    l_index1 = l_proj[index]
+		    e1 := l_index1.Front()
+		    d1 := distance(e1.Value.(map[int]int)[0], e1.Value.(map[int]int)[2])
+		    b[index] = d1
+		    e1 = e1.Next()
+	        }
+
+		dtw := dtw.Dtw{}
+
+		// optionally set your own distance function
+		dtw.DistanceFunction = func(x float64, y float64) float64 {
+		    difference := x - y
+		    return math.Sqrt(difference * difference)
+		}
+		dtw.ComputeOptimalPathWithWindow(a, b, 5) // 5 = window size
+		path := dtw.RetrieveOptimalPath()
+                fmt.Println(path)
 	}
+
 
 }
